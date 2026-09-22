@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - run: cargo test --locked
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/build-native.cjs
+      - run: npm test
+
+  publish-platform:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+          - os: macos-13
+            platform: darwin
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance attestation (separate from auth)
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+      - name: Stamp version from release tag
+        shell: bash
+        run: node scripts/sync-version.cjs "${RELEASE_TAG#v}"
+      - name: Build native binary for this platform
+        run: node scripts/build-native.cjs
+      - name: Publish @sessanchor/${{ matrix.platform }}-${{ matrix.arch }}
+        working-directory: npm/${{ matrix.platform }}-${{ matrix.arch }}
+        run: npm publish --access public --provenance
+
+  publish-root:
+    needs: publish-platform
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance attestation (separate from auth)
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+      - name: Stamp version from release tag
+        run: node scripts/sync-version.cjs "${RELEASE_TAG#v}"
+      - name: Publish sessanchor
+        run: npm publish --access public --provenance

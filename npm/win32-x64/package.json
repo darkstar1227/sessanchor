@@ -1,0 +1,19 @@
+{
+  "name": "@sessanchor/win32-x64",
+  "version": "0.1.0",
+  "description": "sessanchor native binary (win32/x64)",
+  "license": "UNLICENSED",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "sanc.exe",
+    "manifest.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

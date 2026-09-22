@@ -4,3 +4,7 @@
 *.tgz
 /native/
 /dist/
+/npm/*/sanc
+/npm/*/sanc.exe
+/npm/*/manifest.json
+/npm/*/*.tgz

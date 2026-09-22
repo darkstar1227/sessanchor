@@ -22,8 +22,18 @@ installation or persistence across SSH transport loss.
 
 ## Windows remote commands
 
-Experimental and currently paused. A nonterminating-error exit-status fix still
-needs Windows live revalidation; do not treat this mode as fully verified.
+Experimental. The nonterminating-error exit-status fix has been revalidated
+live against a Windows target: `node scripts/verify-windows.cjs STATE_DIR
+DEVICE_ID` (10/10 read-only execution cases). See
+[platform-validation.md](platform-validation.md) for details; do not treat
+this mode as fully verified beyond what is measured there.
+
+After explicitly configuring an authorized Windows device, the same opt-in
+acceptance pattern as Linux applies:
+
+```sh
+node scripts/verify-windows.cjs /absolute/private/state-directory windows-device-id
+```
 
 Use explicit PowerShell mode for Unicode and predictable quoting:
 
@@ -56,10 +66,50 @@ npm install -g ./sessanchor-0.1.0.tgz
 sanc capabilities
 ```
 
-This tarball contains only the build machine's platform/architecture binary.
-Other targets, shared registry distribution, signing/provenance and release CI
-remain pending. The launcher checks platform and SHA-256 for accidental mismatch;
-this is not a publisher signature. `private: true` prevents accidental publishing.
+`npm run build:native` writes the current machine's binary and checksum
+manifest into `npm/<platform>-<arch>/` (e.g. `npm/darwin-arm64/`). A local
+`npm pack`/`npm install -g` from the source checkout only exercises that one
+platform/arch. The launcher (`bin/sanc.cjs`) checks platform and SHA-256 for
+accidental mismatch; this is not a publisher signature.
+
+## npm release publishing
+
+`sessanchor` is split into a thin root package plus one binary package per
+platform/arch (`@sessanchor/darwin-arm64`, `@sessanchor/darwin-x64`,
+`@sessanchor/linux-x64`, `@sessanchor/linux-arm64`, `@sessanchor/win32-x64`),
+listed as `optionalDependencies` on the root package — the same pattern
+`esbuild`/`swc` use. Only the package matching the installer's platform/arch
+is fetched.
+
+`.github/workflows/release.yml` runs on every published GitHub Release: a
+`test` job (`cargo test`/`fmt`/`clippy`, `npm test`) gates a build+publish
+matrix job that builds each platform's binary on its own native runner and
+publishes that platform package, followed by a final job publishing the root
+`sessanchor` package once every platform package is live. Publishing
+authenticates with a classic npm Automation token stored as the `NPM_TOKEN`
+repo secret (`NODE_AUTH_TOKEN` env var, consumed by `actions/setup-node`'s
+generated `.npmrc`); `id-token: write` is still granted separately for npm's
+provenance attestation (`--provenance`), which is independent of how the
+publish itself authenticates. The version published is taken from the
+release's git tag (`vX.Y.Z` → `X.Y.Z`) via `scripts/sync-version.cjs`, not
+from whatever is committed in `package.json`.
+
+Before the first release, this one-time setup is required outside this repo
+(the CLI/agent running this workflow cannot do it — it needs your npm login):
+
+1. The `@sessanchor` scope must exist as an npm Organization (create it at
+   npmjs.com under your account, e.g. `dst-justin`) before any
+   `@sessanchor/<platform>-<arch>` package can be published — a plain
+   personal-scope package (`@dst-justin/...`) would skip this step.
+2. Generate an npm **Automation** token (npmjs.com → Access Tokens →
+   Generate New Token → Automation; classic token, works with the installed
+   npm 10.9.3 CLI — `npm trust`/OIDC trusted publishing is not available on
+   this CLI version) with publish rights on the `sessanchor` org.
+3. Add it as a GitHub repo secret named `NPM_TOKEN`
+   (Settings → Secrets and variables → Actions → New repository secret).
+
+`ubuntu-24.04-arm` and macOS runners may require a paid GitHub Actions plan
+depending on repo visibility.
 
 ## Configure, execute and inspect
 

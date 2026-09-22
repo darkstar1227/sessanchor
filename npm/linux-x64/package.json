@@ -1,0 +1,19 @@
+{
+  "name": "@sessanchor/linux-x64",
+  "version": "0.1.0",
+  "description": "sessanchor native binary (linux/x64)",
+  "license": "UNLICENSED",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "sanc",
+    "manifest.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

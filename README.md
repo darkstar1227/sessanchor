@@ -25,10 +25,16 @@ It ignores SSH config. Remote disconnect persistence, persistent SSH connection
 reuse, interactive shell sessions, human takeover UI, file transfers, password
 authentication, multi-hop and complete Windows support remain unfinished.
 
-Local npm tarball installation is supported for the machine it was built on;
-no registry package has been published. See [usage](docs/usage.md) and
-[agent integration](docs/integrations.md). State uses rusqlite + bundled SQLite,
-not Turso. A successful local test is not a cross-platform production guarantee.
+Local npm tarball installation is supported for the machine it was built on.
+No registry package has been published by hand; a GitHub Actions release
+workflow (`.github/workflows/release.yml`) publishes `sessanchor` plus one
+`@sessanchor/<platform>-<arch>` binary package per target on every published
+GitHub Release, authenticated with an `NPM_TOKEN` repo secret.
+This still requires a one-time manual step per package on npmjs.com before
+the first release — see [usage.md](docs/usage.md#npm-release-publishing).
+See also [agent integration](docs/integrations.md). State uses rusqlite +
+bundled SQLite, not Turso. A successful local test is not a cross-platform
+production guarantee.
 
 ## Development
 

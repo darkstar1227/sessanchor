@@ -4,8 +4,25 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
-const root = path.join(__dirname, '..', 'native');
+
+function resolvePlatformDir() {
+  const platformDir = `${process.platform}-${process.arch}`;
+  const devDir = path.join(__dirname, '..', 'npm', platformDir);
+  if (fs.existsSync(path.join(devDir, 'manifest.json'))) return devDir;
+  const pkgName = `@sessanchor/${platformDir}`;
+  try {
+    return path.dirname(require.resolve(`${pkgName}/package.json`));
+  } catch {
+    throw new Error(
+      `No native binary found for ${platformDir}. Expected optional dependency ` +
+      `${pkgName} to be installed, or a local dev build under npm/${platformDir}/ ` +
+      `(run: node scripts/build-native.cjs).`
+    );
+  }
+}
+
 try {
+  const root = resolvePlatformDir();
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   if (manifest.platform !== process.platform || manifest.arch !== process.arch) {
     throw new Error('This preview package was built for a different platform/architecture.');

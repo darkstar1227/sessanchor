@@ -1,0 +1,19 @@
+{
+  "name": "@sessanchor/darwin-arm64",
+  "version": "0.1.0",
+  "description": "sessanchor native binary (darwin/arm64)",
+  "license": "UNLICENSED",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "sanc",
+    "manifest.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

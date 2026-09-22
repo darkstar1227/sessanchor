@@ -3,7 +3,7 @@
 These are measured tests, not a declaration of full platform support.
 Device addresses, usernames and key paths are intentionally excluded.
 
-Current priority: Pi / Linux remote targets. Windows work is paused by user request.
+Current priority: Pi / Linux remote targets. Windows resumed 2026-09-22; see below.
 
 ## macOS local → Pi 5 Linux ARM64
 
@@ -32,10 +32,13 @@ Current priority: Pi / Linux remote targets. Windows work is paused by user requ
 
 ## macOS local → cf-windows
 
-Paused: expanded validation found nonterminating PowerShell errors reported as
-exit 0 (8/10 execution cases passed). A same-scope status-capture fix is in the
-working tree but has NOT been revalidated on Windows. Earlier successes below
-must not be interpreted as complete Windows support.
+2026-09-22: the previously-uncommitted status-capture fix for nonterminating
+PowerShell errors was revalidated live via `node scripts/verify-windows.cjs
+STATE_DIR cf-windows`: 10/10 execution cases passed, including `error`
+(`Write-Error`) and `missing` (`Get-Item` on a nonexistent path), both of
+which previously returned exit 0 instead of 1. MCP leading-sudo hard stop
+also passed. This still tests Windows as a remote target only; earlier
+successes below must not be interpreted as complete Windows support.
 
 - Strict host-key probe through `sanc device probe`: passed.
 - `ver` as a tracked background task: exit 0, Windows build 10.0.26200.9168.
