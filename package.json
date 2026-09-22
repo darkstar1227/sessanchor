@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Agent-friendly SSH tools — early development preview",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darkstar1227/sessanchor.git"
+  },
   "engines": {
     "node": ">=20"
   },
