@@ -4,6 +4,45 @@ This is not the complete product described by spec.md. Requires Node.js 20+ and
 OpenSSH for runtime; local device storage currently supports macOS/Linux only.
 No remote helper is installed. Remote work may stop on SSH loss.
 
+## Pi / Linux acceptance
+
+After explicitly configuring an authorized Linux device, run from the source checkout:
+
+```sh
+cargo build --locked
+node scripts/verify-linux.cjs /absolute/private/state-directory pi5
+```
+
+The opt-in script creates local journal sessions, runs read-only remote commands,
+and checks CLI/MCP submission, request deduplication, errors, bounded stdout/stderr,
+Unicode/binary output and background execution. It does not install a helper or
+write remote files. An intentional exit 255 remains `unknown` and blocks that test
+session; do not replay it. This validates Linux as a remote target, not Linux-local
+installation or persistence across SSH transport loss.
+
+## Windows remote commands
+
+Experimental and currently paused. A nonterminating-error exit-status fix still
+needs Windows live revalidation; do not treat this mode as fully verified.
+
+Use explicit PowerShell mode for Unicode and predictable quoting:
+
+```sh
+sanc exec windows-session --request-id query-1 --shell powershell --command 'Write-Output "中文"'
+```
+
+MCP `exec` accepts the same optional `shell: "powershell"` field. Default mode
+keeps the SSH server's configured shell. Shell choice is part of request identity:
+changing it while reusing a request ID returns `request_conflict`.
+
+PowerShell mode uses UTF-16LE Base64 transport and UTF-8 console output. Encoded
+payloads over 7,600 characters are rejected before dispatch. On normal completion,
+the last nonzero native exit code takes precedence; otherwise a failed final
+PowerShell statement returns 1. Use explicit `exit N` for scripts needing different
+exit semantics. Native programs may still emit their own non-UTF-8 bytes; those
+remain losslessly available as hex. PowerShell stderr may contain CLIXML.
+The original command is checked for leading `sudo` before encoding.
+
 ## Local npm installation
 
 The developer builds Rust once before packing; npm installation itself neither
@@ -33,6 +72,8 @@ No automatic host-key acceptance is available. State defaults to
 sanc device add lab --host lab.example --user operator --identity /absolute/key
 sanc device probe lab
 sanc device list
+sanc device inspect lab --platform posix
+sanc device pin lab
 sanc device events lab --after 0
 sanc session create maintenance --device lab
 sanc session describe maintenance 'Check OS version; no changes planned.'
@@ -60,6 +101,11 @@ SSH exit 255 is conservatively unknown, even if the remote command itself chose
 255. Password prompts and jump hosts are not supported by this preview adapter.
 
 ## Monitoring daemon (Unix preview)
+
+Use `device inspect DEVICE --platform windows` for Windows OS metadata. Queries
+are explicit remote operations; later `device list` reads only the saved OS name,
+version and timestamp. Pinned devices sort first, followed by last successful
+connection. Frequency-based ranking is not implemented yet.
 
 Run `sanc daemon run` in a dedicated terminal/service. Another terminal can run
 `sanc daemon connect lab`, `sanc daemon status`, and `sanc daemon stop`.

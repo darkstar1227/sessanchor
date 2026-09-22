@@ -2,6 +2,8 @@
 
 狀態：開發預覽，**spec.md 尚未全部完成**。完整待辦見 [roadmap.md](roadmap.md)。
 
+實機測試持續記錄於 [platform-validation.md](platform-validation.md)，包含 cf-windows 與 ds-home 的實際结果及阻礙。
+
 ## 已實作
 
 - Rust CLI、穩定英文 JSON 欄位、`sanc`／npm `sessanchor` 別名。
@@ -39,7 +41,7 @@ CLI／MCP 要求 STOP 並交由使用者，不重試或改寫。無 override。�
 - session 目前是任務分組／序列化，不是持久 shell；cwd/env、PTY、唯讀選單、取消與人類接手 UI 未完成。
 - 7 天／1 GiB 全域 retention 未完成。暫採每 stream 64 MiB cap，溢位標示 truncated，不聲稱保存完整輸出。
 - 密碼／私鑰密語輸入、多跳、首次指紋確認工作流程未完成。
-- 常用排序、置頂與 OS cache 未完成。檔案傳輸／同步／大型續傳未完成。
+- 置頂、最近成功連線排序與 OS cache 已提供；頻率排序及成功連線時自動刷新 OS 尚未完成。檔案傳輸／同步／大型續傳未完成。
 - Unix 資料目錄權限已檢查；Windows ACL／boot ID 尚未實作。其他平台編譯／執行與跨平台 binary 包未驗收。
 - MCP／hook 已做合成協定測試，未在 Claude Code／Codex 的真實 agent session 完成載入、權限與 context-mode 共存驗收。
 - npm registry 尚未發布；package private=true。本機 tarball 只含打包機平台；校驗不是簽章或供應鏈證明。

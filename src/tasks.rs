@@ -28,6 +28,9 @@ pub(crate) fn initialize(db: &Connection) -> rusqlite::Result<()> {
     if !names.iter().any(|n| n == "lease_at") {
         db.execute_batch("ALTER TABLE tasks ADD COLUMN lease_at INTEGER; ALTER TABLE tasks ADD COLUMN worker_boot TEXT;")?;
     }
+    if !names.iter().any(|n| n == "shell") {
+        db.execute_batch("ALTER TABLE tasks ADD COLUMN shell TEXT NOT NULL DEFAULT 'default';")?;
+    }
     let mut stmt = db.prepare("PRAGMA table_info(sessions)")?;
     let names = stmt
         .query_map([], |r| r.get::<_, String>(1))?
@@ -104,10 +107,10 @@ impl ConnectionStore {
         Ok(())
     }
     pub fn task_execution(&self, id: i64) -> Result<(crate::ssh::Target, String), &'static str> {
-        let (device,command):(String,String)=self.db.query_row("SELECT s.device_id,t.command FROM tasks t JOIN sessions s ON s.id=t.session_id WHERE t.id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|_| "task_not_found")?;
+        let (device,command,shell):(String,String,String)=self.db.query_row("SELECT s.device_id,t.command,t.shell FROM tasks t JOIN sessions s ON s.id=t.session_id WHERE t.id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).map_err(|_| "task_not_found")?;
         Ok((
             self.target(&device).map_err(|_| "device_not_configured")?,
-            command,
+            crate::ssh::remote_command(&command, &shell)?,
         ))
     }
     pub fn create_session(&mut self, id: &str, device: &str) -> Result<(), &'static str> {
@@ -159,7 +162,19 @@ impl ConnectionStore {
         command: &str,
         at: i64,
     ) -> Result<TaskView, &'static str> {
+        self.reserve_task_with_shell(session, request, command, "default", at)
+    }
+
+    pub fn reserve_task_with_shell(
+        &mut self,
+        session: &str,
+        request: &str,
+        command: &str,
+        shell: &str,
+        at: i64,
+    ) -> Result<TaskView, &'static str> {
         check_command_policy(command).map_err(|_| "approval_required")?;
+        crate::ssh::remote_command(command, shell)?;
         if !valid_id(request)
             || command.trim().is_empty()
             || command.len() > 65536
@@ -171,16 +186,16 @@ impl ConnectionStore {
             .db
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|_| "database_busy")?;
-        let old: Option<(i64, String)> = tx
+        let old: Option<(i64, String, String)> = tx
             .query_row(
-                "SELECT id,command FROM tasks WHERE session_id=?1 AND request_id=?2",
+                "SELECT id,command,shell FROM tasks WHERE session_id=?1 AND request_id=?2",
                 params![session, request],
-                |r| Ok((r.get(0)?, r.get(1)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()
             .map_err(|_| "database_read_failed")?;
-        let id = if let Some((id, old_command)) = old {
-            if old_command != command {
+        let id = if let Some((id, old_command, old_shell)) = old {
+            if old_command != command || old_shell != shell {
                 return Err("request_conflict");
             }
             id
@@ -205,7 +220,7 @@ impl ConnectionStore {
             if busy {
                 return Err("session_busy");
             }
-            tx.execute("INSERT INTO tasks(session_id,request_id,command,state,created_at) VALUES (?1,?2,?3,'accepted',?4)",params![session,request,command,at]).map_err(|_| "database_write_failed")?;
+            tx.execute("INSERT INTO tasks(session_id,request_id,command,shell,state,created_at) VALUES (?1,?2,?3,?4,'accepted',?5)",params![session,request,command,shell,at]).map_err(|_| "database_write_failed")?;
             tx.last_insert_rowid()
         };
         let task = tx
@@ -261,6 +276,32 @@ mod tests {
         s.create_session("s", "dev").unwrap();
         s
     }
+    #[test]
+    fn shell_is_part_of_durable_request_identity() {
+        let mut s = store();
+        let t = s
+            .reserve_task_with_shell("s", "ps", "Write-Output '中文'", "powershell", 1)
+            .unwrap();
+        assert_eq!(
+            s.reserve_task_with_shell("s", "ps", "Write-Output '中文'", "powershell", 2)
+                .unwrap(),
+            t
+        );
+        assert_eq!(
+            s.reserve_task("s", "ps", "Write-Output '中文'", 2),
+            Err("request_conflict")
+        );
+        assert!(s
+            .task_execution(t.task_id)
+            .unwrap()
+            .1
+            .starts_with("powershell.exe -NoProfile -NonInteractive -EncodedCommand "));
+        assert_eq!(
+            s.reserve_task_with_shell("s", "sudo", " sudo whoami", "powershell", 3),
+            Err("approval_required")
+        );
+    }
+
     #[test]
     fn durable_intent_conflicts_and_one_claim() {
         let mut s = store();

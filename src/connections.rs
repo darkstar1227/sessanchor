@@ -36,6 +36,10 @@ pub struct DeviceView {
     pub last_success_at: Option<i64>,
     pub last_reason_code: Option<String>,
     pub connected_this_boot: bool,
+    pub os_name: Option<String>,
+    pub os_version: Option<String>,
+    pub os_updated_at: Option<i64>,
+    pub pinned: bool,
 }
 
 /// A single future daemon owns this object. Opening a store does not probe hosts.
@@ -61,7 +65,7 @@ impl ConnectionStore {
         db.busy_timeout(std::time::Duration::from_secs(5))?;
         db.execute_batch("PRAGMA foreign_keys = ON;")?;
         let version: i64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 2 {
+        if version > 3 {
             return Err(rusqlite::Error::InvalidParameterName(
                 "unsupported database version".into(),
             ));
@@ -97,6 +101,17 @@ impl ConnectionStore {
                 ALTER TABLE devices ADD COLUMN port INTEGER;
                 ALTER TABLE devices ADD COLUMN identity_path TEXT;
                 PRAGMA user_version = 2;",
+            )?;
+            tx.commit()?;
+        }
+        if version < 3 {
+            let tx = db.transaction()?;
+            tx.execute_batch(
+                "ALTER TABLE devices ADD COLUMN os_name TEXT;
+                ALTER TABLE devices ADD COLUMN os_version TEXT;
+                ALTER TABLE devices ADD COLUMN os_updated_at INTEGER;
+                ALTER TABLE devices ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+                PRAGMA user_version=3;",
             )?;
             tx.commit()?;
         }
@@ -220,9 +235,41 @@ impl ConnectionStore {
         Ok(())
     }
 
+    pub fn save_os(&mut self, id: &str, name: &str, version: &str, at: i64) -> Result<()> {
+        if name.is_empty()
+            || name.len() > 256
+            || version.is_empty()
+            || version.len() > 256
+            || name.chars().chain(version.chars()).any(char::is_control)
+        {
+            return Err(rusqlite::Error::InvalidParameterName(
+                "invalid OS metadata".into(),
+            ));
+        }
+        let n = self.db.execute(
+            "UPDATE devices SET os_name=?2,os_version=?3,os_updated_at=?4 WHERE id=?1",
+            params![id, name, version, at],
+        )?;
+        if n != 1 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        Ok(())
+    }
+
+    pub fn pin(&mut self, id: &str, pinned: bool) -> Result<()> {
+        let n = self.db.execute(
+            "UPDATE devices SET pinned=?2 WHERE id=?1",
+            params![id, pinned],
+        )?;
+        if n != 1 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        Ok(())
+    }
+
     /// Cached list only. On every reopen current state is Unknown for all devices.
     pub fn devices(&self) -> Result<Vec<DeviceView>> {
-        let mut stmt = self.db.prepare("SELECT id,address,last_state,last_checked_at,last_success_at,last_reason_code,success_boot_id FROM devices ORDER BY id")?;
+        let mut stmt = self.db.prepare("SELECT id,address,last_state,last_checked_at,last_success_at,last_reason_code,success_boot_id,os_name,os_version,os_updated_at,pinned FROM devices ORDER BY pinned DESC,last_success_at DESC,id")?;
         let rows = stmt.query_map([], |row| {
             let id: String = row.get(0)?;
             let boot: Option<String> = row.get(6)?;
@@ -239,6 +286,10 @@ impl ConnectionStore {
                 last_success_at: row.get(4)?,
                 last_reason_code: row.get(5)?,
                 connected_this_boot: boot.as_deref() == Some(&self.boot_id),
+                os_name: row.get(7)?,
+                os_version: row.get(8)?,
+                os_updated_at: row.get(9)?,
+                pinned: row.get(10)?,
             })
         })?;
         rows.collect()

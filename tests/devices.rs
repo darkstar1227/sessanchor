@@ -86,3 +86,33 @@ fn rejects_world_readable_state_and_symlink() {
     assert!(!state.run(&["device", "list"]).status.success());
     assert_eq!(std::fs::read(victim).unwrap(), b"not a database");
 }
+
+#[test]
+fn os_cache_and_pin_survive_reopen_without_network() {
+    let state = State::new();
+    let key = state.0.join("key");
+    state.run(&[
+        "device",
+        "add",
+        "sample",
+        "--host",
+        "example.test",
+        "--user",
+        "tester",
+        "--identity",
+        key.to_str().unwrap(),
+    ]);
+    {
+        let mut db = sessanchor::worker::store(&state.0).unwrap();
+        db.save_os("sample", "Microsoft Windows 11 Pro", "10.0.26200", 123)
+            .unwrap();
+        assert!(db.save_os("sample", "bad\nname", "version", 124).is_err());
+    }
+    assert!(state.run(&["device", "pin", "sample"]).status.success());
+    let listed = state.run(&["device", "list"]);
+    let data: Value = serde_json::from_slice(&listed.stdout).unwrap();
+    assert_eq!(data["devices"][0]["os_name"], "Microsoft Windows 11 Pro");
+    assert_eq!(data["devices"][0]["os_updated_at"], 123);
+    assert_eq!(data["devices"][0]["pinned"], true);
+    assert_eq!(data["devices"][0]["current"], "unknown");
+}

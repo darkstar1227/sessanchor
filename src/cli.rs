@@ -53,6 +53,8 @@ enum Commands {
     /// Execute once in a session. No remote persistence on SSH loss yet.
     Exec {
         session: String,
+        #[arg(long, default_value = "default", value_parser = ["default", "powershell"])]
+        shell: String,
         #[arg(long)]
         request_id: String,
         #[arg(long)]
@@ -105,6 +107,16 @@ enum Daemons {
 
 #[derive(Subcommand)]
 enum Devices {
+    Inspect {
+        id: String,
+        #[arg(long,value_parser=["posix","windows"])]
+        platform: String,
+    },
+    Pin {
+        id: String,
+        #[arg(long)]
+        off: bool,
+    },
     Add {
         id: String,
         #[arg(long)]
@@ -178,13 +190,15 @@ fn run(cli: Cli) -> Result<Value, &'static str> {
             },
             Commands::Exec {
                 session,
+                shell,
                 request_id,
                 command,
             } => {
-                let task = db.reserve_task(
+                let task = db.reserve_task_with_shell(
                     &session,
                     &request_id,
                     &command,
+                    &shell,
                     state::now().map_err(|_| "clock_unavailable")?,
                 )?;
                 if task.state == "accepted" {
@@ -229,6 +243,21 @@ fn run(cli: Cli) -> Result<Value, &'static str> {
             let mut store =
                 ConnectionStore::open(path, &boot).map_err(|_| "database_open_failed")?;
             match command {
+                Devices::Inspect { id, platform } => {
+                    let target = store.target(&id).map_err(|_| "device_not_configured")?;
+                    let (name, version) = ssh::inspect_os(&target, &platform)?;
+                    let at = state::now().map_err(|_| "clock_unavailable")?;
+                    store
+                        .save_os(&id, &name, &version, at)
+                        .map_err(|_| "os_cache_save_failed")?;
+                    Ok(
+                        json!({"device_id":id,"os_name":name,"os_version":version,"os_updated_at":at}),
+                    )
+                }
+                Devices::Pin { id, off } => {
+                    store.pin(&id, !off).map_err(|_| "device_not_configured")?;
+                    Ok(json!({"device_id":id,"pinned":!off}))
+                }
                 Devices::Add {
                     id,
                     host,

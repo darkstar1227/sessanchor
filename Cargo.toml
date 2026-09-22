@@ -6,6 +6,7 @@ publish = false
 description = "Agent-friendly SSH session control (contract prototype)"
 
 [dependencies]
+base64 = "0.22"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }

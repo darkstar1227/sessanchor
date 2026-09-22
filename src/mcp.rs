@@ -57,7 +57,7 @@ fn tools(allow_exec: bool) -> Vec<Value> {
             &["id", "description"],
             false,
         ));
-        tools.push(tool("exec","Submit once; reuse request_id on retry. STOP on approval_required. No remote persistence on disconnect yet.",json!({"session":string,"request_id":string,"command":string}),&["session","request_id","command"],false));
+        tools.push(tool("exec","Submit once; reuse request_id on retry. STOP on approval_required. No remote persistence on disconnect yet.",json!({"session":string,"request_id":string,"command":string,"shell":{"type":"string","enum":["default","powershell"]}}),&["session","request_id","command"],false));
     }
     tools
 }
@@ -124,6 +124,12 @@ fn arguments(name: &str, a: &Value, allow_exec: bool) -> Result<Vec<String>, &'s
         "exec" if allow_exec => vec![
             "exec".into(),
             s("session")?,
+            "--shell".into(),
+            if a.get("shell").is_some() {
+                s("shell")?
+            } else {
+                "default".into()
+            },
             "--request-id".into(),
             s("request_id")?,
             "--command".into(),
