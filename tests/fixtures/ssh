@@ -1,0 +1,6 @@
+#!/bin/sh
+# Deterministic test double; never contacts a remote host or executes arguments.
+printf 'called\n' >> "$SANC_TEST_CALLS"
+printf '中文 output\n'
+printf 'diagnostic\n' >&2
+exit "${SANC_TEST_EXIT:-0}"

@@ -1,0 +1,15 @@
+{
+  "name": "sessanchor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent-friendly SSH tools — early development preview",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "bin": { "sanc": "bin/sanc.cjs", "sessanchor": "bin/sanc.cjs" },
+  "files": ["bin/", "native/", "integrations/", "README.md", "docs/usage.md", "docs/integrations.md"],
+  "scripts": {
+    "build:native": "node scripts/build-native.cjs",
+    "prepack": "node scripts/check-native.cjs",
+    "test": "node --test tests/package.test.cjs"
+  }
+}

@@ -1,0 +1,5 @@
+# Merge deliberately into your Codex config; do not overwrite existing servers.
+[mcp_servers.sessanchor]
+command = "sanc"
+args = ["mcp"]
+# Explicitly opt in to remote execution with args = ["mcp", "--allow-exec"].

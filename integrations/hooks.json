@@ -1,0 +1,8 @@
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "mcp__sessanchor__exec",
+      "hooks": [{ "type": "command", "command": "sanc hook", "timeout": 5 }]
+    }]
+  }
+}

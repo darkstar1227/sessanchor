@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "sessanchor": { "command": "sanc", "args": ["mcp"] }
+  }
+}
