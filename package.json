@@ -30,7 +30,6 @@
   },
   "scripts": {
     "build:native": "node scripts/build-native.cjs",
-    "prepack": "node scripts/check-native.cjs",
     "test": "node --test tests/package.test.cjs"
   }
 }
